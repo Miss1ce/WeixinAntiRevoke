@@ -48,12 +48,3 @@
 
 源码构建与验证见 `DEVELOPMENT.md`，维护发布见 `RELEASE.md`。
 
-## 许可与来源
-
-工具沿用 GPL-3.0，见 `LICENSE`。内置的 Iced 1.21.0 使用 MIT 许可，见 `Iced-LICENSE.txt`（源码包内为 `lib/Iced-LICENSE.txt`）。
-
-- https://github.com/icedland/iced
-- https://github.com/zetaloop/BetterWX
-- https://github.com/huiyadanli/RevokeMsgPatcher
-
-本工具与腾讯、微信官方无关。
