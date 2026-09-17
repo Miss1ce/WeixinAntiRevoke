@@ -1,0 +1,65 @@
+name: Build and release
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build desktop application
+        shell: pwsh
+        run: ./src/build.ps1
+      - name: Verify updater in an isolated directory
+        shell: pwsh
+        run: ./src/test-update.ps1
+      - name: Package executable, source, and update information
+        shell: pwsh
+        run: |
+          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { '' }
+          ./src/package.ps1 -ExpectedTag $tag
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-files
+          path: dist/*/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-files
+          path: release-files
+      - name: Publish complete release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:GITHUB_REF_NAME
+          $repo = $env:GITHUB_REPOSITORY
+          $existing = gh release view $tag --repo $repo --json isDraft 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            if (-not ($existing | ConvertFrom-Json).isDraft) { throw 'This release is already public. Publish a new version instead.' }
+          } else {
+            gh release create $tag --repo $repo --verify-tag --draft --title "WeixinAntiRevoke $tag" --notes-file RELEASE_NOTES.txt
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }
+          }
+          $files = @(Get-ChildItem release-files -File -Recurse | ForEach-Object FullName)
+          gh release upload $tag @files --repo $repo --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Upload failed. Release remains a draft.' }
+          gh release edit $tag --repo $repo --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish release.' }

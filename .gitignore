@@ -1,0 +1,6 @@
+/bin/
+/dist/
+*.user
+*.suo
+*.tmp
+.vs/
